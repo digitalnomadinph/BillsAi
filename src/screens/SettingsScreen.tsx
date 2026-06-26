@@ -98,7 +98,7 @@ export default function SettingsScreen() {
   async function saveClientId() {
     const trimmed = oauthClientId.trim()
     await db.settings.update('app', {
-      googleSync: { ...settings?.googleSync, clientId: trimmed || undefined },
+      googleSync: { ...settings?.googleSync, enabled: settings?.googleSync?.enabled ?? false, clientId: trimmed || undefined },
     })
     setClientIdSaved(true)
     setTimeout(() => setClientIdSaved(false), 2000)

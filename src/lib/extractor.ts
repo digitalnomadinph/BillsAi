@@ -45,7 +45,8 @@ async function rasterizePDFPage(blob: Blob): Promise<Blob> {
   canvas.width = viewport.width
   canvas.height = viewport.height
   const ctx = canvas.getContext('2d')!
-  await page.render({ canvasContext: ctx as unknown as CanvasRenderingContext2D, viewport }).promise
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await page.render({ canvasContext: ctx as any, viewport } as any).promise
   return new Promise<Blob>((resolve, reject) =>
     canvas.toBlob(b => (b ? resolve(b) : reject(new Error('canvas.toBlob returned null'))), 'image/jpeg', 0.9)
   )

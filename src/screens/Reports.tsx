@@ -287,7 +287,7 @@ export default function Reports() {
                     <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(148,163,184,0.08)' }} />
                     <Bar dataKey="total" fill="#6366f1" radius={[0, 4, 4, 0]} label={{
                       position: 'right',
-                      formatter: (v: number) => `₱${v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v.toFixed(0)}`,
+                      formatter: (v: unknown) => { const n = Number(v); return `₱${n >= 1000 ? (n / 1000).toFixed(1) + 'k' : n.toFixed(0)}` },
                       fill: '#94a3b8',
                       fontSize: 11,
                     }} />
