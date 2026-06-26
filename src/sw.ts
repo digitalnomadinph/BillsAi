@@ -1,12 +1,9 @@
 /// <reference lib="webworker" />
 import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching'
 
-declare const self: ServiceWorkerGlobalScope
+declare let self: ServiceWorkerGlobalScope & { __WB_MANIFEST: { url: string; revision: string | null }[] }
 
-// Injected by vite-plugin-pwa
-declare const __WB_MANIFEST: { url: string; revision: string | null }[]
-
-precacheAndRoute(__WB_MANIFEST)
+precacheAndRoute(self.__WB_MANIFEST)
 cleanupOutdatedCaches()
 
 // ─── Periodic Background Sync ─────────────────────────────────
