@@ -424,15 +424,15 @@ export default function SettingsScreen() {
         <img
           src="/masterlabs-logo.png"
           alt="Masterlabs"
-          className="h-10 opacity-70"
+          className="h-10 opacity-90"
           onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
         />
-        <p className="text-xs text-slate-600 text-center leading-relaxed">
-          Created by <span className="text-slate-500 font-medium">Masterlabs</span>
+        <p className="text-xs text-slate-400 text-center leading-relaxed">
+          Created by <span className="text-slate-200 font-semibold">Masterlabs</span>
           {' · '}
-          <a href="tel:+639479984309" className="text-slate-500">+63 947 998 4309</a>
+          <a href="tel:+639479984309" className="text-slate-400">+63 947 998 4309</a>
         </p>
-        <p className="text-[10px] text-slate-700">Bills Ai · Your data stays on your device</p>
+        <p className="text-[10px] text-slate-500">Bills Ai · Your data stays on your device</p>
       </div>
       <div className="h-4" />
     </div>
