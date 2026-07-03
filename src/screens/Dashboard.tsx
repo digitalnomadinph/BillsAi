@@ -143,9 +143,13 @@ function HeroCard({ bill, currency, onMarkPaid, onOpen }: {
           <span className="text-3xl">{icon}</span>
           <span className="text-xl font-bold text-slate-100">{bill.biller}</span>
         </div>
-        <span className="text-xl font-bold tabular-nums text-slate-100 shrink-0">
-          {formatCurrency(bill.amount, bill.currency ?? currency)}
-        </span>
+        {bill.amount === 0 && bill.isRecurring ? (
+          <span className="text-sm font-semibold text-amber-400 shrink-0">Amount not set</span>
+        ) : (
+          <span className="text-xl font-bold tabular-nums text-slate-100 shrink-0">
+            {formatCurrency(bill.amount, bill.currency ?? currency)}
+          </span>
+        )}
       </div>
       <p className={`text-sm mb-4 ${isOverdue ? 'text-red-300' : 'text-slate-400'}`}>{dueLine}</p>
       <button

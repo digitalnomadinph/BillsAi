@@ -23,11 +23,15 @@ export default function BillRow({ bill }: { bill: Bill }) {
           <span className={`font-semibold truncate ${status === 'overdue' ? 'text-red-300' : 'text-slate-100'}`}>
             {bill.biller}
           </span>
-          <span className={`font-bold tabular-nums shrink-0 text-sm ${
-            status === 'paid' ? 'text-green-400' : status === 'overdue' ? 'text-red-400' : 'text-slate-100'
-          }`}>
-            {formatCurrency(bill.amount, bill.currency)}
-          </span>
+          {bill.amount === 0 && bill.isRecurring && status !== 'paid' ? (
+            <span className="text-xs font-semibold text-amber-400 shrink-0">Set amount →</span>
+          ) : (
+            <span className={`font-bold tabular-nums shrink-0 text-sm ${
+              status === 'paid' ? 'text-green-400' : status === 'overdue' ? 'text-red-400' : 'text-slate-100'
+            }`}>
+              {formatCurrency(bill.amount, bill.currency)}
+            </span>
+          )}
         </div>
         <div className="flex items-center justify-between gap-2 mt-1">
           <span className="text-xs text-slate-500">

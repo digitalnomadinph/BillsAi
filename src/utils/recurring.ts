@@ -50,7 +50,7 @@ export async function ensureRecurringBills(month: string): Promise<void> {
       id: crypto.randomUUID(),
       biller: template.biller,
       category: template.category,
-      amount: template.amount,
+      amount: 0,
       currency: template.currency,
       dueDate,
       billingMonth: month,
