@@ -6,7 +6,7 @@ import {
   notificationsSupported, getPermissionStatus,
   requestPermission, sendTestNotification, registerPeriodicSync,
 } from '../lib/notifications'
-import { requestToken, syncPush, syncPull, clearToken } from '../lib/googleSync'
+import { requestToken, syncPush, syncPull, clearToken, getUserEmail } from '../lib/googleSync'
 import type { SyncResult } from '../lib/googleSync'
 
 const ALL_LEAD_DAYS = [0, 1, 2, 3, 5, 7, 14]
@@ -24,19 +24,13 @@ export default function SettingsScreen() {
   const [togglingNotif, setTogglingNotif] = useState(false)
 
   // ── Google sync state ──────────────────────────────────────
-  const [oauthClientId,  setOauthClientId]  = useState('')
-  const [clientIdSaved,  setClientIdSaved]  = useState(false)
+  const [connectedEmail, setConnectedEmail] = useState<string | null>(null)
   const [syncing,        setSyncing]        = useState(false)
   const [syncResult,     setSyncResult]     = useState<SyncResult & { msg: string } | null>(null)
-  const [showSetup,      setShowSetup]      = useState(false)
 
   useEffect(() => {
     setGeminiKey(settings?.geminiApiKey ?? '')
   }, [settings?.geminiApiKey])
-
-  useEffect(() => {
-    setOauthClientId(settings?.googleSync.clientId ?? '')
-  }, [settings?.googleSync.clientId])
 
   // Poll permission status — user may change it in browser settings
   useEffect(() => {
@@ -95,21 +89,35 @@ export default function SettingsScreen() {
   }
 
   // ── Google sync handlers ──────────────────────────────────
-  async function saveClientId() {
-    const trimmed = oauthClientId.trim()
-    await db.settings.update('app', {
-      googleSync: { ...settings?.googleSync, enabled: settings?.googleSync?.enabled ?? false, clientId: trimmed || undefined },
-    })
-    setClientIdSaved(true)
-    setTimeout(() => setClientIdSaved(false), 2000)
+  async function handleSignIn() {
+    if (syncing) return
+    setSyncing(true); setSyncResult(null)
+    try {
+      const token = await requestToken()
+      const email = await getUserEmail(token)
+      setConnectedEmail(email)
+      const r = await syncPush()
+      await db.settings.update('app', { googleSync: { ...settings?.googleSync, enabled: true, lastSyncAt: new Date().toISOString() } })
+      setSyncResult({
+        ...r,
+        msg: r.ok
+          ? `Backed up ${r.pushed} bill${r.pushed !== 1 ? 's' : ''}${r.filesUploaded ? `, ${r.filesUploaded} file${r.filesUploaded !== 1 ? 's' : ''} uploaded` : ''}`
+          : (r.error ?? 'Unknown error'),
+      })
+    } catch (err) {
+      setSyncResult({ ok: false, msg: err instanceof Error ? err.message : 'Sign-in cancelled' })
+    } finally { setSyncing(false) }
   }
 
   async function handleSync() {
-    const cid = settings?.googleSync.clientId
-    if (!cid || syncing) return
+    if (syncing) return
     setSyncing(true); setSyncResult(null)
     try {
-      const r = await syncPush(cid)
+      const token = await requestToken()
+      const email = await getUserEmail(token)
+      if (email) setConnectedEmail(email)
+      const r = await syncPush()
+      await db.settings.update('app', { googleSync: { ...settings?.googleSync, enabled: true, lastSyncAt: new Date().toISOString() } })
       setSyncResult({
         ...r,
         msg: r.ok
@@ -120,11 +128,10 @@ export default function SettingsScreen() {
   }
 
   async function handleRestore() {
-    const cid = settings?.googleSync.clientId
-    if (!cid || syncing) return
+    if (syncing) return
     setSyncing(true); setSyncResult(null)
     try {
-      const r = await syncPull(cid)
+      const r = await syncPull()
       setSyncResult({
         ...r,
         msg: r.ok
@@ -136,21 +143,9 @@ export default function SettingsScreen() {
 
   async function handleDisconnect() {
     clearToken()
+    setConnectedEmail(null)
     await db.settings.update('app', { googleSync: { enabled: false } })
-    setOauthClientId(''); setSyncResult(null)
-  }
-
-  // Connect = request token then push
-  async function handleConnect() {
-    const cid = settings?.googleSync.clientId
-    if (!cid || syncing) return
-    setSyncing(true); setSyncResult(null)
-    try {
-      await requestToken(cid)   // throws if user denies
-      await handleSync()
-    } catch (err) {
-      setSyncResult({ ok: false, msg: err instanceof Error ? err.message : 'Authorization cancelled' })
-    } finally { setSyncing(false) }
+    setSyncResult(null)
   }
 
   const notifEnabled = settings?.notificationsEnabled ?? false
@@ -307,115 +302,76 @@ export default function SettingsScreen() {
 
       {/* Cloud Backup */}
       <Section title="Cloud Backup (Google Drive)">
-        <div className="divide-y divide-slate-800">
-
-          {/* Setup instructions */}
-          <div className="px-4 py-4 space-y-3">
-            <p className="text-sm text-slate-400 leading-relaxed">
-              Back up your bills to your own Google Drive and restore on any device. Uses your free Google account — no subscription needed.
-            </p>
-            <button
-              onClick={() => setShowSetup(s => !s)}
-              className="text-xs text-blue-400 underline underline-offset-2"
-            >
-              {showSetup ? 'Hide setup instructions ▲' : 'How to set up ▼'}
-            </button>
-            {showSetup && (
-              <ol className="text-xs text-slate-500 leading-relaxed space-y-1.5 list-decimal list-inside">
-                <li>Go to <span className="text-slate-400">console.cloud.google.com</span> and create a project.</li>
-                <li>Enable the <span className="text-slate-400">Google Drive API</span> and <span className="text-slate-400">Google Sheets API</span>.</li>
-                <li>Go to <span className="text-slate-400">APIs &amp; Services → Credentials → Create Credentials → OAuth 2.0 Client ID</span>.</li>
-                <li>Choose <span className="text-slate-400">Web application</span> as the application type.</li>
-                <li>Under <span className="text-slate-400">Authorized JavaScript origins</span>, add your app URL (e.g. <span className="text-slate-400 font-mono">http://localhost:5176</span> for local, or your deployed URL).</li>
-                <li>Copy the <span className="text-slate-400">Client ID</span> (ends with <span className="font-mono">.apps.googleusercontent.com</span>) and paste it below.</li>
-              </ol>
-            )}
-          </div>
-
-          {/* Client ID input */}
-          <div className="px-4 py-4 space-y-2">
-            <label className={labelCls}>OAuth Client ID</label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={oauthClientId}
-                onChange={e => setOauthClientId(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && saveClientId()}
-                placeholder="……apps.googleusercontent.com"
-                autoComplete="off"
-                spellCheck={false}
-                className="flex-1 px-3 py-3 rounded-xl bg-slate-800 text-slate-100 border border-slate-700 focus:border-blue-500 focus:outline-none text-xs font-mono"
-              />
+        <div className="px-4 py-4 space-y-3">
+          {!connectedEmail && !settings?.googleSync.enabled ? (
+            /* ── Not connected ── */
+            <>
+              <p className="text-sm text-slate-400 leading-relaxed">
+                Back up your bills to Google Drive and restore on any device.
+                Uses your free Google account — no setup needed.
+              </p>
               <button
-                onClick={saveClientId}
-                className={`px-4 py-3 rounded-xl font-semibold text-sm transition-colors shrink-0 ${
-                  clientIdSaved ? 'bg-green-600 text-white' : 'bg-blue-600 text-white active:bg-blue-700'
-                }`}
+                onClick={handleSignIn}
+                disabled={syncing}
+                className="w-full py-3.5 rounded-xl bg-white text-slate-900 font-bold text-sm active:bg-slate-100 disabled:opacity-50 flex items-center justify-center gap-2.5"
               >
-                {clientIdSaved ? '✓' : 'Save'}
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="" className="w-5 h-5" />
+                <span>{syncing ? 'Signing in…' : 'Sign in with Google'}</span>
               </button>
-            </div>
-          </div>
-
-          {/* Connect / sync controls */}
-          {settings?.googleSync.clientId && (
-            <div className="px-4 py-4 space-y-3">
-              {!settings.googleSync.enabled ? (
-                <button
-                  onClick={handleConnect}
-                  disabled={syncing}
-                  className="w-full py-3.5 rounded-xl bg-blue-600 text-white font-bold text-sm active:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  <span>🔗</span>
-                  <span>{syncing ? 'Connecting…' : 'Connect Google & Back Up'}</span>
-                </button>
-              ) : (
-                <>
-                  {settings.googleSync.lastSyncAt && (
-                    <p className="text-xs text-slate-500">
-                      Last synced: {format(new Date(settings.googleSync.lastSyncAt), 'MMM d, yyyy · h:mm a')}
+            </>
+          ) : (
+            /* ── Connected ── */
+            <>
+              <div className="flex items-center gap-3 px-3 py-3 rounded-xl bg-slate-800/60 border border-slate-700/60">
+                <span className="text-xl">✅</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-slate-200">Connected to Google Drive</p>
+                  {connectedEmail && (
+                    <p className="text-xs text-slate-500 truncate">{connectedEmail}</p>
+                  )}
+                  {settings?.googleSync.lastSyncAt && (
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      Last backup: {format(new Date(settings.googleSync.lastSyncAt), 'MMM d · h:mm a')}
                     </p>
                   )}
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={handleSync}
-                      disabled={syncing}
-                      className="py-3 rounded-xl bg-blue-600 text-white font-semibold text-sm active:bg-blue-700 disabled:opacity-50"
-                    >
-                      {syncing ? '…' : '☁️ Back Up Now'}
-                    </button>
-                    <button
-                      onClick={handleRestore}
-                      disabled={syncing}
-                      className="py-3 rounded-xl bg-slate-700 text-slate-200 font-semibold text-sm active:bg-slate-600 disabled:opacity-50"
-                    >
-                      {syncing ? '…' : '⬇️ Restore'}
-                    </button>
-                  </div>
-                  <button
-                    onClick={handleDisconnect}
-                    className="text-xs text-red-400 underline underline-offset-2"
-                  >
-                    Disconnect Google
-                  </button>
-                </>
-              )}
+                </div>
+              </div>
 
-              {/* Result message */}
-              {syncResult && (
-                <p className={`text-xs leading-relaxed ${syncResult.ok ? 'text-green-400' : 'text-red-400'}`}>
-                  {syncResult.ok ? '✓ ' : '✗ '}{syncResult.msg}
-                </p>
-              )}
-            </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={handleSync}
+                  disabled={syncing}
+                  className="py-3 rounded-xl bg-blue-600 text-white font-semibold text-sm active:bg-blue-700 disabled:opacity-50"
+                >
+                  {syncing ? '…' : '☁️ Back Up Now'}
+                </button>
+                <button
+                  onClick={handleRestore}
+                  disabled={syncing}
+                  className="py-3 rounded-xl bg-slate-700 text-slate-200 font-semibold text-sm active:bg-slate-600 disabled:opacity-50"
+                >
+                  {syncing ? '…' : '⬇️ Restore'}
+                </button>
+              </div>
+
+              <button
+                onClick={handleDisconnect}
+                className="text-xs text-red-400 underline underline-offset-2"
+              >
+                Disconnect Google
+              </button>
+            </>
           )}
 
-          {/* Scope note */}
-          <div className="px-4 py-4">
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Uses the <span className="text-slate-500 font-mono">drive.file</span> scope — the app can only see files and folders it created in your Drive. Bills are stored in a <span className="text-slate-500">Bills Ai</span> folder as a Google Sheet and individual invoice/receipt files.
+          {syncResult && (
+            <p className={`text-xs leading-relaxed ${syncResult.ok ? 'text-green-400' : 'text-red-400'}`}>
+              {syncResult.ok ? '✓ ' : '✗ '}{syncResult.msg}
             </p>
-          </div>
+          )}
+
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Only sees files it created in your Drive — nothing else in your Google account is accessible.
+          </p>
         </div>
       </Section>
 

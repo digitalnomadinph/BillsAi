@@ -32,7 +32,9 @@ export interface SyncResult {
 
 // ─── Constants ────────────────────────────────────────────────
 
-const SCOPES       = 'https://www.googleapis.com/auth/drive.file'
+export const BUILT_IN_CLIENT_ID = '12625715824-r6a95l8a4ctgeajqk7qe5mprknq50s4r.apps.googleusercontent.com'
+
+const SCOPES       = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email'
 const FOLDER_NAME  = 'Bills Ai'
 const SHEET_NAME   = 'Bills Ai - Data'
 const HEADERS: (keyof BillRow)[] = [
@@ -70,7 +72,17 @@ async function loadGIS(): Promise<void> {
   })
 }
 
-export async function requestToken(clientId: string): Promise<string> {
+export async function getUserEmail(token: string): Promise<string | null> {
+  try {
+    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const data = await res.json() as { email?: string }
+    return data.email ?? null
+  } catch { return null }
+}
+
+export async function requestToken(clientId = BUILT_IN_CLIENT_ID): Promise<string> {
   if (_token && Date.now() < _tokenExpiry - 60_000) return _token
   await loadGIS()
   return new Promise((resolve, reject) => {
@@ -235,7 +247,7 @@ function rowToBill(headers: string[], row: string[]): Bill | null {
 
 // ─── High-level sync ──────────────────────────────────────────
 
-export async function syncPush(clientId: string): Promise<SyncResult> {
+export async function syncPush(clientId = BUILT_IN_CLIENT_ID): Promise<SyncResult> {
   try {
     const token    = await requestToken(clientId)
     const settings = await db.settings.get('app')
@@ -275,7 +287,7 @@ export async function syncPush(clientId: string): Promise<SyncResult> {
   }
 }
 
-export async function syncPull(clientId: string): Promise<SyncResult> {
+export async function syncPull(clientId = BUILT_IN_CLIENT_ID): Promise<SyncResult> {
   try {
     const token    = await requestToken(clientId)
     const settings = await db.settings.get('app')
