@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useNavigate } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
@@ -8,6 +8,7 @@ import {
   currentMonth, formatCurrency, getDisplayStatus,
   daysUntilDue, CATEGORY_META, formatMonthLabel,
 } from '../utils/bills'
+import { ensureRecurringBills } from '../utils/recurring'
 import MonthSelector from '../components/MonthSelector'
 import BillRow from '../components/BillRow'
 import MarkPaidSheet from '../components/MarkPaidSheet'
@@ -16,6 +17,8 @@ export default function Dashboard() {
   const [month, setMonth] = useState(currentMonth())
   const [markPaidBill, setMarkPaidBill] = useState<Bill | null>(null)
   const navigate = useNavigate()
+
+  useEffect(() => { ensureRecurringBills(month) }, [month])
 
   const bills = useLiveQuery(
     () => db.bills.where('billingMonth').equals(month).sortBy('dueDate'),
