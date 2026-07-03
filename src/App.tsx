@@ -17,7 +17,12 @@ export default function App() {
   return (
     <BrowserRouter>
       <div className="flex flex-col min-h-svh bg-slate-950">
-        <main className="flex-1 flex flex-col pb-16">
+        {/* Masterlabs branding bar — shown on every page */}
+        <header className="fixed top-0 inset-x-0 z-40 h-9 bg-slate-900/95 backdrop-blur border-b border-slate-800/60 flex items-center justify-center shrink-0">
+          <img src="/masterlabs-logo.png" alt="Masterlabs" className="h-5 object-contain" />
+        </header>
+
+        <main className="flex-1 flex flex-col pb-shell pt-9">
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/bills" element={<Bills />} />
