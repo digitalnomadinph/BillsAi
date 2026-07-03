@@ -24,11 +24,13 @@ export async function ensureRecurringBills(month: string): Promise<void> {
     }
   }
 
-  // What's already in the target month?
+  // What unpaid bills already exist in the target month?
+  // Paid bills are NOT considered blockers — if a month's bill was accidentally
+  // paid or carried over wrong, a fresh unpaid one should still be created.
   const existingThisMonth = await db.bills.where('billingMonth').equals(month).toArray()
   const existingKeys = new Set(
     existingThisMonth
-      .filter(b => b.isRecurring)
+      .filter(b => b.isRecurring && b.status !== 'paid')
       .map(b => `${b.biller}|${b.recurrenceDay ?? parseInt(b.dueDate.slice(8, 10), 10)}`)
   )
 

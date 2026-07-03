@@ -61,6 +61,12 @@ export default function BillDetail() {
     }
   }
 
+  async function handleMarkUnpaid() {
+    if (!bill) return
+    const { paidDate: _pd, paidAmount: _pa, paymentProofFileId: _pf, ...rest } = bill
+    await db.bills.put({ ...rest, status: 'unpaid', updatedAt: new Date().toISOString() })
+  }
+
   async function handleDelete() {
     if (!bill) return
     await db.bills.delete(bill.id)
@@ -123,15 +129,23 @@ export default function BillDetail() {
           </div>
         ) : (
           <div className="mx-4 mt-4 px-4 py-4 rounded-xl bg-green-950/50 border border-green-800/40 space-y-3">
-            <div>
-              <p className="text-sm font-semibold text-green-400">
-                ✅ Paid on {bill.paidDate ? format(new Date(bill.paidDate + 'T00:00:00'), 'MMMM d, yyyy') : '—'}
-              </p>
-              {bill.paidAmount !== undefined && (
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Amount paid: ₱{bill.paidAmount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold text-green-400">
+                  ✅ Paid on {bill.paidDate ? format(new Date(bill.paidDate + 'T00:00:00'), 'MMMM d, yyyy') : '—'}
                 </p>
-              )}
+                {bill.paidAmount !== undefined && (
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Amount paid: ₱{bill.paidAmount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={handleMarkUnpaid}
+                className="shrink-0 text-xs text-slate-500 underline underline-offset-2 active:text-slate-300"
+              >
+                Undo payment
+              </button>
             </div>
 
             {/* Proof */}
@@ -189,8 +203,8 @@ export default function BillDetail() {
 
       {/* Delete confirmation sheet */}
       {showDelete && (
-        <div className="fixed inset-0 bg-black/60 flex items-end z-50 p-4" onClick={() => setShowDelete(false)}>
-          <div className="w-full bg-slate-800 rounded-2xl p-5 flex flex-col gap-3" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/60 flex items-end justify-center z-[100] p-4" onClick={() => setShowDelete(false)}>
+          <div className="w-full sm:max-w-md bg-slate-800 rounded-2xl px-5 pt-5 pb-safe flex flex-col gap-3" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-slate-100">Delete "{bill.biller}"?</h3>
             <p className="text-sm text-slate-400">This cannot be undone.</p>
             <button
