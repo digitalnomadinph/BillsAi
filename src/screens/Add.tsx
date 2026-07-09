@@ -1,8 +1,11 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
+import type { Bill, BillCategory } from '../db'
 import { extractFromFile, type ExtractionResult } from '../lib/extractor'
 import BillForm, { type BillFormSubmitData } from '../components/BillForm'
+import { CATEGORY_META, formatMonthLabel } from '../utils/bills'
 
 type Stage =
   | { tag: 'choose' }
@@ -23,7 +26,7 @@ type Stage =
       fileName: string
       previewUrl: string | null
     }
-  | { tag: 'manual' }
+  | { tag: 'manual'; prefill?: { biller?: string; category?: BillCategory; amountHint?: number } }
 
 export default function Add() {
   const navigate = useNavigate()
@@ -31,6 +34,17 @@ export default function Add() {
   const [showRaw, setShowRaw] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
+
+  // Past paid bills — deduplicated by biller, most recently paid first
+  const history = useLiveQuery(async () => {
+    const paid = await db.bills.filter(b => b.status === 'paid').toArray()
+    paid.sort((a, b) => (b.paidDate ?? b.updatedAt).localeCompare(a.paidDate ?? a.updatedAt))
+    const seen = new Map<string, Bill>()
+    for (const bill of paid) {
+      if (!seen.has(bill.biller)) seen.set(bill.biller, bill)
+    }
+    return Array.from(seen.values()).slice(0, 8)
+  }, [], []) ?? []
 
   async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -66,7 +80,7 @@ export default function Add() {
       invoiceFileId = crypto.randomUUID()
       await db.files.add({ id: invoiceFileId, blob, mimeType: mimeType ?? 'application/octet-stream', name: fileName ?? 'invoice', createdAt: now })
     }
-    await db.bills.add({ id: crypto.randomUUID(), ...data, status: 'unpaid', invoiceFileId, createdAt: now, updatedAt: data.updatedAt })
+    await db.bills.add({ id: crypto.randomUUID(), ...data, status: 'unpaid', isRecurring: false, invoiceFileId, createdAt: now, updatedAt: data.updatedAt })
     navigate('/')
   }
 
@@ -96,9 +110,18 @@ export default function Add() {
 
       {stage.tag === 'choose' && (
         <ChooseStage
+          history={history}
           onCamera={() => cameraRef.current?.click()}
           onFile={() => fileRef.current?.click()}
           onManual={() => setStage({ tag: 'manual' })}
+          onFromHistory={bill => setStage({
+            tag: 'manual',
+            prefill: {
+              biller: bill.biller,
+              category: bill.category,
+              amountHint: bill.paidAmount ?? bill.amount,
+            },
+          })}
         />
       )}
 
@@ -137,7 +160,15 @@ export default function Add() {
 
       {stage.tag === 'manual' && (
         <div className="flex-1 overflow-y-auto">
-          <BillForm onSave={data => handleSave(data)} saveLabel="Save Bill" />
+          <BillForm
+            initial={{
+              biller: stage.prefill?.biller,
+              category: stage.prefill?.category,
+            }}
+            amountHint={stage.prefill?.amountHint}
+            onSave={data => handleSave(data)}
+            saveLabel="Save Bill"
+          />
           <div className="h-4" />
         </div>
       )}
@@ -147,13 +178,22 @@ export default function Add() {
 
 // ─── Stage sub-components ────────────────────────────────────
 
-function ChooseStage({ onCamera, onFile, onManual }: { onCamera: () => void; onFile: () => void; onManual: () => void }) {
+function ChooseStage({
+  history, onCamera, onFile, onManual, onFromHistory,
+}: {
+  history: Bill[]
+  onCamera: () => void
+  onFile: () => void
+  onManual: () => void
+  onFromHistory: (bill: Bill) => void
+}) {
   return (
-    <div className="flex-1 flex flex-col px-5 pt-6 gap-4">
+    <div className="flex-1 overflow-y-auto px-5 pt-6 pb-6 flex flex-col gap-4">
       <p className="text-sm text-slate-400 text-center leading-relaxed">
         Upload your invoice to auto-fill the details, or enter them manually.
       </p>
-      <div className="grid grid-cols-2 gap-3 mt-1">
+
+      <div className="grid grid-cols-2 gap-3">
         <button onClick={onCamera} className="flex flex-col items-center gap-3 py-7 rounded-2xl bg-slate-800 border border-slate-700/60 active:bg-slate-700 transition-colors">
           <span className="text-4xl">📷</span>
           <span className="text-sm font-semibold text-slate-200">Take Photo</span>
@@ -163,16 +203,53 @@ function ChooseStage({ onCamera, onFile, onManual }: { onCamera: () => void; onF
           <span className="text-sm font-semibold text-slate-200">Upload File</span>
         </button>
       </div>
-      <div className="flex items-center gap-3 my-1">
+
+      <div className="flex items-center gap-3">
         <div className="flex-1 h-px bg-slate-800" />
         <span className="text-xs text-slate-600">or</span>
         <div className="flex-1 h-px bg-slate-800" />
       </div>
+
       <button onClick={onManual} className="w-full py-4 rounded-2xl bg-slate-800 border border-slate-700/60 font-semibold text-slate-200 active:bg-slate-700 flex items-center justify-center gap-2">
         <span>✏️</span>
         <span>Enter Manually</span>
       </button>
-      <p className="text-xs text-slate-600 text-center mt-1 leading-relaxed px-2">
+
+      {history.length > 0 && (
+        <>
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-slate-800" />
+            <span className="text-xs text-slate-600">or pick from history</span>
+            <div className="flex-1 h-px bg-slate-800" />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            {history.map(bill => {
+              const lastAmount = bill.paidAmount ?? bill.amount
+              const { icon } = CATEGORY_META[bill.category]
+              const monthLabel = formatMonthLabel(bill.billingMonth)
+              return (
+                <button
+                  key={bill.id}
+                  onClick={() => onFromHistory(bill)}
+                  className="flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-slate-800 border border-slate-700/60 active:bg-slate-700 text-left transition-colors"
+                >
+                  <span className="text-2xl w-8 text-center shrink-0">{icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-200 truncate">{bill.biller}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Last paid: ₱{lastAmount.toLocaleString('en-PH', { minimumFractionDigits: 2 })} · {monthLabel}
+                    </p>
+                  </div>
+                  <span className="text-slate-600 text-lg shrink-0">›</span>
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
+
+      <p className="text-xs text-slate-600 text-center leading-relaxed px-2">
         Accepts JPEG, PNG and PDF. OCR runs on-device — your files never leave your phone.
       </p>
     </div>

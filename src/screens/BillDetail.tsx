@@ -81,8 +81,6 @@ export default function BillDetail() {
       amount: data.amount,
       dueDate: data.dueDate,
       billingMonth: getBillingMonth(data.dueDate),
-      isRecurring: data.isRecurring,
-      recurrenceDay: data.recurrenceDay,
       notes: data.notes,
       updatedAt: data.updatedAt,
     })
@@ -182,8 +180,6 @@ export default function BillDetail() {
             category: bill.category,
             amount: String(bill.amount),
             dueDate: bill.dueDate,
-            isRecurring: bill.isRecurring,
-            recurrenceDay: bill.recurrenceDay ? String(bill.recurrenceDay) : '',
             notes: bill.notes ?? '',
           }}
           onSave={handleSave}

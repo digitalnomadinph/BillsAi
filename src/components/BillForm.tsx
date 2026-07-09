@@ -10,8 +10,6 @@ export interface BillFormSubmitData {
   currency: string
   dueDate: string
   billingMonth: string
-  isRecurring: boolean
-  recurrenceDay?: number
   notes?: string
   updatedAt: string
 }
@@ -22,21 +20,18 @@ interface Props {
     category?: BillCategory
     amount?: string
     dueDate?: string
-    isRecurring?: boolean
-    recurrenceDay?: string
     notes?: string
   }
+  amountHint?: number
   onSave: (data: BillFormSubmitData) => Promise<void>
   saveLabel?: string
 }
 
-export default function BillForm({ initial = {}, onSave, saveLabel = 'Save Bill' }: Props) {
+export default function BillForm({ initial = {}, amountHint, onSave, saveLabel = 'Save Bill' }: Props) {
   const [biller, setBiller] = useState(initial.biller ?? '')
   const [category, setCategory] = useState<BillCategory>(initial.category ?? 'utility')
   const [amount, setAmount] = useState(initial.amount ?? '')
   const [dueDate, setDueDate] = useState(initial.dueDate ?? format(new Date(), 'yyyy-MM-dd'))
-  const [isRecurring, setIsRecurring] = useState(initial.isRecurring ?? false)
-  const [recurrenceDay, setRecurrenceDay] = useState(initial.recurrenceDay ?? '')
   const [notes, setNotes] = useState(initial.notes ?? '')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
@@ -69,8 +64,6 @@ export default function BillForm({ initial = {}, onSave, saveLabel = 'Save Bill'
         currency: 'PHP',
         dueDate,
         billingMonth: getBillingMonth(dueDate),
-        isRecurring,
-        recurrenceDay: isRecurring && recurrenceDay ? parseInt(recurrenceDay) : undefined,
         notes: notes.trim() || undefined,
         updatedAt: new Date().toISOString(),
       })
@@ -136,6 +129,11 @@ export default function BillForm({ initial = {}, onSave, saveLabel = 'Save Bill'
             className={inputCls + ' pl-9'}
           />
         </div>
+        {amountHint !== undefined && amountHint > 0 && (
+          <p className="text-xs text-slate-500 mt-1.5">
+            Last paid: ₱{amountHint.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+          </p>
+        )}
         {errors.amount && <p className={errCls}>{errors.amount}</p>}
       </div>
 
@@ -151,34 +149,6 @@ export default function BillForm({ initial = {}, onSave, saveLabel = 'Save Bill'
         />
         {errors.dueDate && <p className={errCls}>{errors.dueDate}</p>}
       </div>
-
-      {/* Recurring */}
-      <label className="flex items-center gap-3 py-1 cursor-pointer select-none">
-        <input
-          type="checkbox"
-          checked={isRecurring}
-          onChange={e => setIsRecurring(e.target.checked)}
-          className="w-5 h-5 rounded accent-blue-600 shrink-0"
-        />
-        <span className="text-sm font-medium text-slate-300">Recurring monthly bill</span>
-      </label>
-
-      {isRecurring && (
-        <div>
-          <label htmlFor="recDay" className={labelCls}>Usual day of month due <span className="text-slate-500 font-normal">(1–31)</span></label>
-          <input
-            id="recDay"
-            type="number"
-            inputMode="numeric"
-            min="1"
-            max="31"
-            value={recurrenceDay}
-            onChange={e => setRecurrenceDay(e.target.value)}
-            placeholder="e.g. 15"
-            className={inputCls}
-          />
-        </div>
-      )}
 
       {/* Notes */}
       <div>

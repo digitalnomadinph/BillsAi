@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useNavigate } from 'react-router-dom'
 import { db } from '../db'
 import { currentMonth, getDisplayStatus } from '../utils/bills'
-import { ensureRecurringBills } from '../utils/recurring'
 import MonthSelector from '../components/MonthSelector'
 import BillRow from '../components/BillRow'
 
@@ -14,7 +13,6 @@ export default function Bills() {
   const [tab, setTab] = useState<Tab>('unpaid')
   const navigate = useNavigate()
 
-  useEffect(() => { ensureRecurringBills(month) }, [month])
 
   const bills = useLiveQuery(
     () => db.bills.where('billingMonth').equals(month).sortBy('dueDate'),
