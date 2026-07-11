@@ -375,6 +375,14 @@ export default function SettingsScreen() {
         </div>
       </Section>
 
+      {/* Data Management */}
+      <Section title="Data Management">
+        <div className="divide-y divide-slate-800">
+          <ClearMonthRow />
+          <ClearAllRow />
+        </div>
+      </Section>
+
       {/* Branding footer */}
       <div className="px-4 py-8 flex flex-col items-center gap-3">
         <img
@@ -391,6 +399,125 @@ export default function SettingsScreen() {
         <p className="text-[10px] text-slate-500">Bills Ai v2 · Your data stays on your device</p>
       </div>
       <div className="h-4" />
+    </div>
+  )
+}
+
+function ClearMonthRow() {
+  const [open, setOpen] = useState(false)
+  const [month, setMonth] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  })
+  const [deleting, setDeleting] = useState(false)
+  const [done, setDone] = useState(false)
+
+  async function handleDelete() {
+    if (deleting) return
+    setDeleting(true)
+    try {
+      const keys = await db.bills.where('billingMonth').equals(month).primaryKeys()
+      await db.bills.bulkDelete(keys as string[])
+      setDone(true)
+      setTimeout(() => { setDone(false); setOpen(false) }, 1500)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  return (
+    <div className="px-4 py-4 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-slate-200">Delete bills by month</p>
+          <p className="text-xs text-slate-500 mt-0.5">Remove all bills for a specific month</p>
+        </div>
+        <button
+          onClick={() => setOpen(o => !o)}
+          className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-sm font-semibold active:bg-slate-700 shrink-0"
+        >
+          {open ? 'Close' : 'Select month'}
+        </button>
+      </div>
+
+      {open && (
+        <div className="space-y-3 pt-1">
+          <input
+            type="month"
+            value={month}
+            onChange={e => setMonth(e.target.value)}
+            className="w-full px-4 py-3 rounded-xl bg-slate-800 text-slate-100 border border-slate-700 focus:border-red-500 focus:outline-none text-base"
+          />
+          <button
+            onClick={handleDelete}
+            disabled={deleting || done}
+            className="w-full py-3.5 rounded-xl bg-red-600 text-white font-bold active:bg-red-700 disabled:opacity-50 transition-colors"
+          >
+            {done ? '✓ Deleted' : deleting ? 'Deleting…' : `Delete all bills for ${month}`}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ClearAllRow() {
+  const [confirm, setConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [done, setDone] = useState(false)
+
+  async function handleClearAll() {
+    if (deleting) return
+    setDeleting(true)
+    try {
+      await db.bills.clear()
+      await db.files.clear()
+      setDone(true)
+      setTimeout(() => { setDone(false); setConfirm(false) }, 1500)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  return (
+    <div className="px-4 py-4 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-red-400">Clear all data</p>
+          <p className="text-xs text-slate-500 mt-0.5">Wipe all bills and files from this device</p>
+        </div>
+        <button
+          onClick={() => setConfirm(true)}
+          className="px-4 py-2 rounded-xl bg-red-950/60 border border-red-800/40 text-red-400 text-sm font-semibold active:bg-red-900/60 shrink-0"
+        >
+          Clear all
+        </button>
+      </div>
+
+      {confirm && (
+        <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-[100]" onClick={() => !deleting && setConfirm(false)}>
+          <div className="w-full sm:max-w-md bg-slate-900 border border-slate-700/60 rounded-t-2xl px-5 pt-5 pb-safe flex flex-col gap-3" onClick={e => e.stopPropagation()}>
+            <h3 className="text-base font-bold text-slate-100">Clear all data?</h3>
+            <p className="text-sm text-slate-400">
+              This permanently deletes <strong className="text-red-400">all bills and uploaded files</strong> from this device. Your settings are kept. This cannot be undone.
+            </p>
+            <button
+              onClick={handleClearAll}
+              disabled={deleting || done}
+              className="w-full py-4 bg-red-600 text-white rounded-xl font-bold active:bg-red-700 disabled:opacity-50 mt-1"
+            >
+              {done ? '✓ Cleared' : deleting ? 'Clearing…' : 'Yes, delete everything'}
+            </button>
+            <button
+              onClick={() => setConfirm(false)}
+              disabled={deleting}
+              className="w-full py-3.5 bg-slate-800 text-slate-200 rounded-xl font-semibold active:bg-slate-700 mb-1"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
