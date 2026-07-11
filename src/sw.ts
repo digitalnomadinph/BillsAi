@@ -6,6 +6,10 @@ declare let self: ServiceWorkerGlobalScope & { __WB_MANIFEST: { url: string; rev
 precacheAndRoute(self.__WB_MANIFEST)
 cleanupOutdatedCaches()
 
+// Take over immediately when a new version is deployed
+self.addEventListener('install', () => self.skipWaiting())
+self.addEventListener('activate', event => event.waitUntil(self.clients.claim()))
+
 // ─── Periodic Background Sync ─────────────────────────────────
 
 self.addEventListener('periodicsync' as 'activate', (event) => {
