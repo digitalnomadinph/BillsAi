@@ -396,7 +396,7 @@ export default function SettingsScreen() {
           {' · '}
           <a href="tel:+639479984309" className="text-slate-400">+63 947 998 4309</a>
         </p>
-        <p className="text-[10px] text-slate-500">Bills Ai v2 · Your data stays on your device</p>
+        <p className="text-[10px] text-slate-500">Bills Ai v3 · Your data stays on your device</p>
       </div>
       <div className="h-4" />
     </div>
