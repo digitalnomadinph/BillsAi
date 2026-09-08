@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { APP_VERSION } from '../version'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { format } from 'date-fns'
 import { db } from '../db'
@@ -396,7 +397,7 @@ export default function SettingsScreen() {
           {' · '}
           <a href="tel:+639479984309" className="text-slate-400">+63 947 998 4309</a>
         </p>
-        <p className="text-[10px] text-slate-500">Bills Ai v3.8.26 · Your data stays on your device</p>
+        <p className="text-[10px] text-slate-500">Bills Ai v{APP_VERSION} · Your data stays on your device</p>
       </div>
       <div className="h-4" />
     </div>

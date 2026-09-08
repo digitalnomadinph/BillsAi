@@ -3,14 +3,28 @@ import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching'
 
 declare let self: ServiceWorkerGlobalScope & { __WB_MANIFEST: { url: string; revision: string | null }[] }
 
+const CACHE_VERSION = 'bills-ai-cache-v3.8.26'
+
 precacheAndRoute(self.__WB_MANIFEST)
 cleanupOutdatedCaches()
 
-// Take over immediately on message from the update banner
+// Take over immediately — skip waiting and claim all clients
+self.addEventListener('install', () => self.skipWaiting())
+self.addEventListener('activate', event =>
+  event.waitUntil(
+    // Drop any old versioned caches, then claim all clients
+    caches.keys()
+      .then(keys => Promise.all(
+        keys.filter(k => k !== CACHE_VERSION && k.startsWith('bills-ai-cache-')).map(k => caches.delete(k))
+      ))
+      .then(() => self.clients.claim())
+  )
+)
+
+// Also handle explicit SKIP_WAITING message from the in-app update banner
 self.addEventListener('message', event => {
   if ((event.data as { type?: string })?.type === 'SKIP_WAITING') self.skipWaiting()
 })
-self.addEventListener('activate', event => event.waitUntil(self.clients.claim()))
 
 // ─── Periodic Background Sync ─────────────────────────────────
 
